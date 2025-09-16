@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<body>
+<h2>抓取 GPS/IP 並送到 Tines</h2>
+<p id="status">正在抓取位置…</p>
+
+<script>
+async function sendToTines(data){
+    try{
+        const res = await fetch("https://snowy-grass-5288.tines.com/webhook/hello-world/7ca9f7ff1ee6f3715eeb80a706372092", {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify(data)
+        });
+
+        if(!res.ok) throw new Error("HTTP error " + res.status);
+
+        document.getElementById("status").innerText = "✅ 已送出資料到 Tines";
+    }catch(err){
+        document.getElementById("status").innerText = "❌ 發送失敗";
+        console.error(err);
+    }
+}
+
+// 嘗試抓 GPS
+if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(
+        pos=>{
+            const data = {
+                lat: pos.coords.latitude,
+                lon: pos.coords.longitude,
+                ts: Date.now()
+            };
+            sendToTines(data);
+        },
+        async err=>{
+            console.warn("GPS 抓取失敗，改抓 IP", err);
+            try{
+                const res = await fetch("http://ip-api.com/json/");
+                const ipData = await res.json();
+                const data = {ip: ipData.query, ts: Date.now()};
+                sendToTines(data);
+            }catch(e){
+                document.getElementById("status").innerText = "❌ 發送失敗";
+                console.error(e);
+            }
+        },
+        {enableHighAccuracy:true}
+    );
+}else{
+    // 瀏覽器不支援 GPS → 抓 IP
+    fetch("http://ip-api.com/json/")
+        .then(res=>res.json())
+        .then(ipData=>sendToTines({ip: ipData.query, ts: Date.now()}))
+        .catch(err=>{
+            document.getElementById("status").innerText = "❌ 發送失敗";
+            console.error(err);
+        });
+}
+</script>
+</body>
+</html>
